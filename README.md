@@ -1,16 +1,16 @@
 # vqueue/connector (PHP)
 
-Protección de cola **dentro de la app PHP del cliente**. Equivalente server-side
-del JS adapter: el visitante no puede saltearla desactivando JavaScript.
+Queue protection **inside your own PHP app**. It is the server-side equivalent of
+the JS adapter: a visitor can't bypass it by disabling JavaScript.
 
-## Uso
+## Usage
 
 ```php
 use VQueue\Connector\Guard;
 
 $guard = new Guard(
-    client: 'orome',                        // subdominio de la compañía
-    privateKey: getenv('VQUEUE_PRIVATE_KEY'), // nunca hardcodeada
+    client: 'orome',                          // your company subdomain
+    privateKey: getenv('VQUEUE_PRIVATE_KEY'), // never hardcode it
 );
 
 $decision = $guard->decide([
@@ -44,42 +44,42 @@ if (isset($decision['renew'])) {
 }
 ```
 
-## El cache importa más acá que en las otras integraciones
+## The cache matters more here than in the other integrations
 
-En Workers, Lambda o Node hay un proceso vivo donde cachear los settings. En
-PHP-FPM el proceso muere con el request, así que sin cache compartido **cada page
-view pagaría un round trip a la API**.
+In Workers, Lambda, or Node there is a long-lived process where settings can be
+cached. In PHP-FPM the process dies with the request, so without a shared cache
+**every page view would pay a round trip to the API**.
 
-Por defecto se usa APCu (compartido por el pool de FPM) y, si no está, un archivo
-en el directorio temporal. Con Redis o Memcached, implementá `SettingsCache` e
-inyectalo:
+By default it uses APCu (shared by the FPM pool) and, if that isn't available, a
+file in the temp directory. With Redis or Memcached, implement `SettingsCache` and
+inject it:
 
 ```php
-$guard = new Guard(client: 'orome', privateKey: $key, cache: new MiCacheRedis());
+$guard = new Guard(client: 'orome', privateKey: $key, cache: new MyRedisCache());
 ```
 
-Verificá que APCu esté habilitado (`apc.enabled=1`); el fallback a disco funciona
-pero es más lento. En runtimes persistentes (Octane, RoadRunner, Swoole) sirve
-`MemorySettingsCache`.
+Make sure APCu is enabled (`apc.enabled=1`); the disk fallback works but is slower.
+In persistent runtimes (Octane, RoadRunner, Swoole), `MemorySettingsCache` works.
 
-Si la API del admin no responde, se sigue sirviendo la última configuración
-buena (hasta una hora) y se espera unos segundos antes de reintentar: una caída
-del admin no deja el sitio sin protección ni le agrega el timeout a cada página.
+If the admin API stops responding, the last good configuration keeps being served
+(for up to an hour) and the guard waits a few seconds before retrying: an admin
+outage neither leaves your site unprotected nor adds a timeout to every page.
 
-El nombre del archivo del cache a disco sale de un hash que incluye la
-`private_key`: en un hosting compartido, `/tmp` es escribible por todos y un
-vecino que adivinara el nombre podría dejar ahí sus propios settings.
+The disk cache file name comes from a hash that includes the `private_key`: on
+shared hosting `/tmp` is writable by everyone, and a neighbor who guessed the name
+could drop their own settings there.
 
-## Qué hace
+## What it does
 
-1. **Bypass barato** — assets, `/api/`, WebSockets y métodos que no son GET/HEAD.
-2. **Vuelta de la cola** — canjea `?vq_token=`, emite `vq_pass_<event_id>` y
-   vuelve al destino original. Un `?token=` propio del sitio no se secuestra.
-3. **ACLs** — por prioridad, primera gana.
-4. **Pase** — verifica el HMAC **offline** con la `private_key`.
-5. **Renovación deslizante** — mientras el visitante navegue, el pase se extiende.
+1. **Cheap bypass** — assets, `/api/`, WebSockets, and methods other than GET/HEAD.
+2. **Return from the queue** — exchanges `?vq_token=`, issues `vq_pass_<event_id>`,
+   and returns to the original destination. Your site's own `?token=` is never
+   hijacked.
+3. **ACLs** — by priority, first match wins.
+4. **Pass** — verifies the HMAC **offline** with the `private_key`.
+5. **Sliding renewal** — while the visitor keeps browsing, the pass is extended.
 
-Todo falla abierto.
+Everything fails open.
 
 ## Tests
 
