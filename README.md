@@ -35,13 +35,7 @@ if ($decision['type'] === 'redirect') {
     exit;
 }
 
-if (isset($decision['renew'])) {
-    $r = $decision['renew'];
-    setcookie($r['name'], $r['value'], [
-        'expires' => time() + $r['maxAge'], 'path' => '/',
-        'httponly' => true, 'secure' => true, 'samesite' => 'Lax',
-    ]);
-}
+// 'allow' and 'bypass' need nothing else: the pass cookie is never rewritten.
 ```
 
 ## The cache matters more here than in the other integrations
@@ -77,7 +71,9 @@ could drop their own settings there.
    hijacked.
 3. **ACLs** — by priority, first match wins.
 4. **Pass** — verifies the HMAC **offline** with the `private_key`.
-5. **Sliding renewal** — while the visitor keeps browsing, the pass is extended.
+5. **Fixed budget** — the pass cookie lasts exactly `cookie_lifetime` (10 minutes by
+   default) from the moment the visitor leaves the queue. It is never renewed while
+   they browse: a checkout slower than that goes back to the queue.
 
 Everything fails open.
 

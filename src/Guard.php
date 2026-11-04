@@ -72,7 +72,7 @@ final class Guard
      * Decide qué hacer con un request.
      *
      * @param array{path: string, query: array, cookies: array, method: string, isWebsocket?: bool} $request
-     * @return array{type: string, location?: string, cookies?: array, renew?: array}
+     * @return array{type: string, location?: string, cookies?: array}
      */
     public function decide(array $request): array
     {
@@ -135,17 +135,11 @@ final class Guard
         // 3) ¿Ya tiene pase para este evento?
         $pass = QueuePass::validFor($cookies, $eventId, $this->privateKey, $this->now());
         if ($pass['ok']) {
-            // Renovación deslizante: mientras el visitante navegue, el pase se
-            // extiende. Sin esto es un presupuesto fijo desde que salió de la
-            // fila y una compra lenta vuelve a la cola a mitad de camino.
-            return [
-                'type' => 'allow',
-                'renew' => [
-                    'name' => QueuePass::cookieName($eventId),
-                    'value' => $cookies[QueuePass::cookieName($eventId)],
-                    'maxAge' => $settings['cookie_lifetime'],
-                ],
-            ];
+            // El pase no se renueva: la cookie dura exactamente cookie_lifetime
+            // desde que el visitante salió de la fila, siga navegando o no. Es
+            // un presupuesto fijo para comprar; una compra más lenta vuelve a
+            // la cola.
+            return ['type' => 'allow'];
         }
 
         // 4) A la sala de espera

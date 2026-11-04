@@ -97,15 +97,15 @@ final class GuardTest extends TestCase
         self::assertSame('/shop/entradas?fila=3', $target['value']);
     }
 
-    public function test_deja_pasar_al_que_tiene_pase_valido_y_lo_renueva(): void
+    public function test_deja_pasar_al_que_tiene_pase_valido_sin_reescribir_la_cookie(): void
     {
         $decision = $this->guard()->decide($this->request([
             'cookies' => [QueuePass::cookieName('ev-42') => self::PASS],
         ]));
 
-        self::assertSame('allow', $decision['type']);
-        self::assertSame(QueuePass::cookieName('ev-42'), $decision['renew']['name']);
-        self::assertSame(600, $decision['renew']['maxAge']);
+        // Sin `renew`: el pase dura cookie_lifetime desde que se emitió y no se
+        // extiende mientras el visitante navega.
+        self::assertSame(['type' => 'allow'], $decision);
     }
 
     public function test_con_pase_vencido_vuelve_a_la_cola(): void
